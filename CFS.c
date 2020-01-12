@@ -3,5 +3,5 @@
 #include<string.h>
 
 int main(int argc,char** argv){
-    printf("master\n");
+    printf("Rena\n");
 }
