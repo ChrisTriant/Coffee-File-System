@@ -13,3 +13,8 @@ typedef struct {
     //Datastream data ;
 } MDS ;
 
+typedef struct{
+  char fileType[4];
+  int block_size;
+  int numOfFiles;
+}superBlockStruct;

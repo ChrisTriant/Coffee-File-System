@@ -2,80 +2,81 @@
 #include<stdlib.h>
 #include<string.h>
 #include<fcntl.h>
+#include<unistd.h>
+#include "struct.h"
 
 #define PERMS 0644
 
 int cfs_created=0;
 
 int scan_options();
-void cfs_create(char* filename,int block_size);
+void cfs_create(char* filename,int block_size,int* fd);
 
 int main(int argc,char** argv){
-
-
-    while(1){
-        int err=scan_options();
-    }
+    int err=scan_options();
     
-
 }
 
 int scan_options(){
-    char buffer[150];
     const char skip[2]=" ";
     char* token;
-    char* t=fgets(buffer,sizeof(buffer),stdin);
-    if(t==NULL){
-        return -1;
+    char* buffer;
+    size_t bufsize=150;
+    buffer=malloc(sizeof(char)*bufsize);
+   
+    while(getline(&buffer,&bufsize,stdin)!=EOF){
+        token=strtok(buffer,"\n");
+        token=strtok(buffer,skip);
+        if(strcmp(token,"cfs_create")==0){
+            if(token != NULL ) {
+                token = strtok(NULL,skip);
+            }
+            if(token==NULL||strcmp(token,"-bs")!=0){
+                printf("Input Error\n");
+                continue;
+            }
+            if(token != NULL ) {
+                token = strtok(NULL,skip);
+            }
+            if(token==NULL){
+                printf("Input Error\n");
+                continue;
+            }
+            char* filename=malloc(strlen(token)+1);
+            strcpy(filename,token);
+            printf("Give block size: ");
+            int bs;
+            scanf("%d",&bs);
+            int fd;
+            cfs_create(filename,bs,&fd);
+            free(filename);
+        }else if(strcmp(token,"cfs_exit")==0){
+            return -2;
+        }
+        printf("Input Error\n");
     }
-    token=strtok(buffer,skip);
-    if(strcmp(buffer,"cfs_create")==0){
-        if(token != NULL ) {
-                    token = strtok(NULL,skip);
-                }
-        if(token==NULL||strcmp(token,"-bs")!=0){
-            return -1;
-        }
-        if(token != NULL ) {
-            token = strtok(NULL,skip);
-        }
-        if(token==NULL){
-            return -1;
-        }
-        char* filename=malloc(strlen(token)+1);
-        strcpy(filename,token);
-        printf("Give block size: ");
-        int bs;
-        scanf("%d",&bs);
-        cfs_create(filename,bs);
-
-
-    }
+    free(buffer);
+    return -1;
 }
 
-void cfs_create(char* filename,int block_size){
-	int filedes;
-	
-	if ( (filedes=open(filename, O_CREAT|O_RDWR, PERMS)) == -1){
-		perror("creating");
-		exit(1);
-		}
-	else { 
-		printf("Managed to get to the file successfully\n"); 
-        cfs_created=1;
+void cfs_create(char* filename,int block_size, int *fd){
+    if ( (*fd=open(filename, O_CREAT|O_RDWR, PERMS)) == -1){
+        perror("creating");
+        return;
+	}else{
+		printf("Managed to get to the file successfully\n");
+		cfs_created = 0;
 	}
-    
-    FILE* file=fopen(filename,"r+");
-    fseek(file,0,SEEK_SET);
-    char buffer[block_size];
-    memset(buffer,0,block_size);
-    printf("ok\n");
-    memcpy(file,buffer,block_size);
-    char token[4]="cfs";
-    memcpy(file,token,sizeof(token));
-        printf("ok\n");
-    fseek(file,sizeof(token),SEEK_SET);
-        printf("ok\n");
-    memcpy(file,&block_size,sizeof(int));
-    free(filename);
+    char fileType[4] = "cfs";
+
+    superBlockStruct superblock;
+    printf("Filling superBlock\n");
+    memcpy(&superblock.block_size, &block_size, sizeof(int));
+    memcpy(&superblock.fileType, fileType, strlen(fileType));
+    memset(&superblock.numOfFiles, 0, sizeof(int));
+
+    int bytes1;
+    lseek(*fd, 0, SEEK_SET);
+    bytes1 = write(*fd, &superblock, sizeof(superBlockStruct));
+    printf("%d bytes were written. \n", bytes1);
 }
