@@ -26,6 +26,7 @@ int scan_options(){
     buffer=malloc(sizeof(char)*bufsize);
    
     while(getline(&buffer,&bufsize,stdin)!=EOF){
+        token=strtok(buffer,"\n");
         token=strtok(buffer,skip);
         if(strcmp(token,"cfs_create")==0){
             if(token != NULL ) {
