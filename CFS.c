@@ -57,7 +57,7 @@ int scan_options(){
         }else if(strcmp(token,"cfs_exit")==0){
             return -2;
         }
-        printf("Input Error\n");
+        printf("\n");
     }
     free(buffer);
     return -1;
@@ -71,34 +71,37 @@ void cfs_create(char* filename,int block_size, int *fd){
 		printf("Managed to get to the file successfully\n");
 		cfs_created = 0;
 	}
-    char fileType[4] = "cfs";
-
     superBlockStruct superblock;
-    printf("Filling superBlock\n");
-    memcpy(&superblock.block_size, &block_size, sizeof(int));
-    memcpy(&superblock.fileType, fileType, strlen(fileType));
-    memset(&superblock.numOfFiles, 0, sizeof(int));
-
     lseek(*fd, 0, SEEK_SET);
-    write(*fd, &superblock, sizeof(superBlockStruct));
-    MDS mds;
-    init_MDS(&mds,0,0,"/");
-    lseek(*fd,block_size,SEEK_SET);
-    write(*fd,&mds,sizeof(MDS));
-    close(*fd);
+    memcpy(&superblock,fd,sizeof(superblock));
+    if(superblock.block_size==0){
+        superblock.block_size=block_size;
+        //superblock.numOfFiles=???
+        strcpy(superblock.fileType,"cfs");
+        lseek(*fd, 0, SEEK_SET);
+        write(*fd, &superblock, sizeof(superBlockStruct));
+        printf("Filling superBlock\n");
+        MDS mds;
+        init_MDS(&mds,0,0,"/");
+        lseek(*fd,block_size,SEEK_SET);
+        write(*fd,&mds,sizeof(MDS));
+        close(*fd);
+    }else{
+        printf("File already exists\n");
+    }
 }
 
-void cfs_workwith(char *filename, int *fd){
-    if(open_fd!=NULL){
-        close(*fd);
-    }
-    if ( (*fd=open(filename, O_RDWR, PERMS)) == -1){
-        perror("opening");
-        return;
-    }else{
-        open_fd=fd;
-        printf("Managed to open the file successfully\n");
-    }
+    void cfs_workwith(char *filename, int *fd){
+        if(open_fd!=NULL){
+            close(*fd);
+        }
+        if ( (*fd=open(filename, O_RDWR, PERMS)) == -1){
+            perror("opening");
+            return;
+        }else{
+            open_fd=fd;
+            printf("Managed to open the file successfully\n");
+        }
 }
 
 void print_time(time_t time){
