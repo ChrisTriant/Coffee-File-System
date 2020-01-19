@@ -12,6 +12,8 @@ int* open_fd=NULL;
 
 int scan_options();
 void cfs_create(char* filename,int block_size,int* fd);
+void init_MDS(MDS* mds,unsigned int node_id,unsigned int parent_nodeid,char* filename);
+void print_time(time_t time);
 
 int main(int argc,char** argv){
     int err=scan_options();
@@ -51,6 +53,7 @@ int scan_options(){
             int fd;
             cfs_create(filename,bs,&fd);
             free(filename);
+            continue;
         }else if(strcmp(token,"cfs_exit")==0){
             return -2;
         }
@@ -61,7 +64,7 @@ int scan_options(){
 }
 
 void cfs_create(char* filename,int block_size, int *fd){
-    if ( (*fd=open(filename, O_CREAT|O_RDWR, PERMS)) == -1){
+    if ( (*fd=open(filename, O_CREAT, PERMS)) == -1){
         perror("creating");
         return;
 	}else{
@@ -76,19 +79,12 @@ void cfs_create(char* filename,int block_size, int *fd){
     memcpy(&superblock.fileType, fileType, strlen(fileType));
     memset(&superblock.numOfFiles, 0, sizeof(int));
 
-    int bytes1;
     lseek(*fd, 0, SEEK_SET);
-    bytes1 = write(*fd, &superblock, sizeof(superBlockStruct));
-
+    write(*fd, &superblock, sizeof(superBlockStruct));
     MDS mds;
-    mds.nodeid=mds.parent_nodeid=0;
-    memcpy(mds.filename,"/",2*sizeof(char));
-    mds.type=0;
-    mds.size=0;
-    mds.creation_time=time(NULL);
-    mds.access_time=time(NULL);
-    mds.modification_time=time(NULL);
-    printf("cr time:%ld\n",mds.creation_time);
+    init_MDS(&mds,0,0,"/");
+    lseek(*fd,block_size,SEEK_SET);
+    write(*fd,&mds,sizeof(MDS));
     close(*fd);
 }
 
@@ -103,4 +99,17 @@ void cfs_workwith(char *filename, int *fd){
         open_fd=fd;
         printf("Managed to open the file successfully\n");
     }
+}
+
+void print_time(time_t time){
+    printf("%s\n",asctime(localtime(&time)));
+}
+
+void init_MDS(MDS* mds,unsigned int node_id,unsigned int parent_nodeid,char* filename){
+    mds->nodeid=node_id;
+    mds->parent_nodeid=parent_nodeid;
+    memcpy(mds->filename,filename,sizeof(mds->filename));
+    mds->type=0;
+    mds->size=0;
+    mds->creation_time=mds->access_time=mds->modification_time=time(NULL);
 }
