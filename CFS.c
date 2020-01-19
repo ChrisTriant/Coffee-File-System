@@ -8,6 +8,7 @@
 #define PERMS 0644
 
 int cfs_created=0;
+int* open_fd=NULL;
 
 int scan_options();
 void cfs_create(char* filename,int block_size,int* fd);
@@ -25,7 +26,6 @@ int scan_options(){
     buffer=malloc(sizeof(char)*bufsize);
    
     while(getline(&buffer,&bufsize,stdin)!=EOF){
-        token=strtok(buffer,"\n");
         token=strtok(buffer,skip);
         if(strcmp(token,"cfs_create")==0){
             if(token != NULL ) {
@@ -78,5 +78,28 @@ void cfs_create(char* filename,int block_size, int *fd){
     int bytes1;
     lseek(*fd, 0, SEEK_SET);
     bytes1 = write(*fd, &superblock, sizeof(superBlockStruct));
-    printf("%d bytes were written. \n", bytes1);
+
+    MDS mds;
+    mds.nodeid=mds.parent_nodeid=0;
+    memcpy(mds.filename,"/",2*sizeof(char));
+    mds.type=0;
+    mds.size=0;
+    mds.creation_time=time(NULL);
+    mds.access_time=time(NULL);
+    mds.modification_time=time(NULL);
+    printf("cr time:%ld\n",mds.creation_time);
+    close(*fd);
+}
+
+void cfs_workwith(char *filename, int *fd){
+    if(open_fd!=NULL){
+        close(*fd);
+    }
+    if ( (*fd=open(filename, O_RDWR, PERMS)) == -1){
+        perror("opening");
+        return;
+    }else{
+        open_fd=fd;
+        printf("Managed to open the file successfully\n");
+    }
 }
