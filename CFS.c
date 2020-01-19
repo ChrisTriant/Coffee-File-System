@@ -64,7 +64,7 @@ int scan_options(){
 }
 
 void cfs_create(char* filename,int block_size, int *fd){
-    if ( (*fd=open(filename, O_CREAT, PERMS)) == -1){
+    if ( (*fd=open(filename, O_CREAT|O_RDWR, PERMS)) == -1){
         perror("creating");
         return;
 	}else{
