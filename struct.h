@@ -3,10 +3,11 @@
 
 typedef struct {
     unsigned int nodeid ;
+    unsigned int parent_nodeid ;
     char filename[FILENAME_SIZE] ;
     unsigned int size ;
     unsigned int type ;
-    unsigned int parent_nodeid ;
+    int counter;
     time_t creation_time ;
     time_t access_time ;
     time_t modification_time ;
@@ -17,4 +18,6 @@ typedef struct{
   char fileType[4];
   int block_size;
   int numOfFiles;
+  int counter;
+  int node_counter;
 }superBlockStruct;
