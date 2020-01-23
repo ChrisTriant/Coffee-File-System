@@ -236,6 +236,7 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
         get_node_data(open_fd,parent,block_size);
         write_node_index(nodeid,parent_mds.counter,block_size,open_fd);
         parent_mds.counter++;
+        parent_mds.modification_time=time(NULL);
         update_node_mds(&parent_mds,parent,block_size,open_fd);
         superBlockStruct super_block;
         get_superblock(open_fd,&super_block);
@@ -246,17 +247,19 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
     }    
 }
 
-void cfs_touch(char* dir_name,unsigned int parent,int block_size){
+void cfs_touch(char* file_name,unsigned int parent,int block_size){
     if(open_fd==-1){
         printf("Error! No CFS file in use.\n");
         return;
     }
+    char* token;
+    token=strtok(file_name," ");
     MDS parent_mds;
     get_node_mds(&parent_mds,parent,open_fd,block_size);   //get parent mds to check counter and update
     if(parent_mds.counter<=(block_size-sizeof(MDS))/sizeof(int)){
         unsigned int nodeid=find_space(open_fd,block_size);
         MDS new_mds;
-        init_MDS(&new_mds,nodeid,parent,dir_name,1);          //create new mds
+        init_MDS(&new_mds,nodeid,parent,token,1);          //create new mds
         lseek(open_fd,(nodeid+1)*block_size,SEEK_SET);   
         write(open_fd,&new_mds,sizeof(MDS));
 
@@ -268,6 +271,10 @@ void cfs_touch(char* dir_name,unsigned int parent,int block_size){
         get_superblock(open_fd,&super_block);
         super_block.node_counter++;
         set_superblock(open_fd,&super_block);
+        token=strtok(NULL,"\n");
+            if(token!=NULL){
+                cfs_touch(token,parent,block_size);
+            }
     }else{
         printf("This directory is full\n");
     }    
@@ -310,6 +317,9 @@ void cfs_cd(char* dest_name,unsigned int* current_nodeid,int block_size){
                 return;
             }
             *current_nodeid=check_id;
+            get_node_mds(&mds,*current_nodeid,open_fd,block_size);
+            mds.access_time=time(NULL);
+            update_node_mds(&mds,*current_nodeid,block_size,open_fd);
             token=strtok(NULL,"\n");
             if(token!=NULL){
                 cfs_cd(token,current_nodeid,block_size);
