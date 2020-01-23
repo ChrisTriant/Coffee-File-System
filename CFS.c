@@ -220,6 +220,10 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
         printf("Error! No CFS file in use.\n");
         return;
     }
+    if(find_data(parent,dir_name,block_size,open_fd)!=-1){
+        printf("A directory with this name already exits\n");
+        return;
+    }
     MDS parent_mds;
     get_node_mds(&parent_mds,parent,open_fd,block_size);   //get parent mds to check counter and update
     if(parent_mds.counter<=(block_size-sizeof(MDS))/sizeof(int)){
@@ -289,16 +293,27 @@ void cfs_cd(char* dest_name,unsigned int* current_nodeid,int block_size){
     }
     MDS mds;
     get_node_mds(&mds,*current_nodeid,open_fd,block_size);
-    if(strcmp(dest_name,"..")==0){
-        *current_nodeid=mds.parent_nodeid;
+    if(strcmp(dest_name,".")==0){
+        *current_nodeid=mds.nodeid;
     }else if(strcmp(dest_name,"..")==0){
         *current_nodeid=mds.parent_nodeid;
     }else if(strcmp(dest_name,"/")==0){
         *current_nodeid=0;
     }else{
-        int check_id=find_data(*current_nodeid,dest_name,block_size,open_fd);
+        char* token;
+        token=strtok(dest_name,"/");
+        int check_id=find_data(*current_nodeid,token,block_size,open_fd);
         if(check_id!=-1){
+            get_node_mds(&mds,check_id,open_fd,block_size);
+            if(mds.type==1){
+                printf("This is not a directory\n");
+                return;
+            }
             *current_nodeid=check_id;
+            token=strtok(NULL,"\n");
+            if(token!=NULL){
+                cfs_cd(token,current_nodeid,block_size);
+            }
         }else{
             printf("File %s not found in this directory\n",dest_name);
         }
@@ -371,6 +386,10 @@ int find_data(unsigned int nodeid,char*name,int block_size,int fd){
     get_node_data(fd,nodeid,block_size);
     int data_id;
     int i;
+    if(mds.counter==0){
+        return -1;
+    }
+    int offset=1;
     for(i=0;i<mds.counter;i++){
         read(fd,&data_id,sizeof(int));
         if(data_id!=0){
@@ -381,6 +400,9 @@ int find_data(unsigned int nodeid,char*name,int block_size,int fd){
         }else{
             i--;
         }
+        get_node_data(fd,nodeid,block_size);
+        lseek(fd,offset*sizeof(int),SEEK_CUR);
+        offset++;
     }
     if(i=mds.counter){
         return -1;
