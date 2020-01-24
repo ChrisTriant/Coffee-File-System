@@ -243,6 +243,10 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
         init_MDS(&new_mds,nodeid,parent,token,0);          //create new mds
         lseek(open_fd,(nodeid+1)*block_size,SEEK_SET);   
         write(open_fd,&new_mds,sizeof(MDS));
+        lseek(open_fd, block_size- sizeof(int), SEEK_CUR);
+        int buf = 0;
+        write(open_fd, &buf, sizeof(char));
+
 
         get_node_data(open_fd,parent,block_size);
         write_node_index(nodeid,parent_mds.counter,open_fd);
@@ -388,19 +392,22 @@ void cfs_ls(char* args, unsigned int current_nodeid,int block_size,int fd){
     char* token;
     int option=0;
     token=strtok(args," ");
-    if(strcmp(token,"-m")==0){
-        option=1;
-        token=strtok(NULL," ");
-        if(token == NULL ) {
-            printf("Input Error\n");
-        }
-    }else if(strcmp(token,"-a")==0){
-        option=2;
-        token=strtok(NULL," ");
-        if(token == NULL ) {
-            printf("Input Error\n");
+    if(token != NULL) {
+        if (strcmp(token, "-m") == 0) {
+            option = 1;
+            token = strtok(NULL, " ");
+            if (token == NULL) {
+                printf("Input Error\n");
+            }
+        } else if (strcmp(token, "-a") == 0) {
+            option = 2;
+            token = strtok(NULL, " ");
+            if (token == NULL) {
+                printf("Input Error\n");
+            }
         }
     }
+
     MDS mds;
     MDS data_mds;
     get_node_mds(&mds,current_nodeid,fd,block_size);
