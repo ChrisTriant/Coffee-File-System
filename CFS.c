@@ -124,15 +124,15 @@ int scan_options(){
                 continue;
             }
 
-            char* file_name=malloc(strlen(token)+1);
-            strcpy(file_name,token);
+            char* args=malloc(strlen(token)+1);
+            strcpy(args,token);
             token = strtok(NULL,"\n");
             if(token!=NULL){
                 printf("Input Error\n");
                 continue;
             }
-            cfs_touch(file_name,current_nodeid,block_size);
-            free(file_name);
+            cfs_touch(args,current_nodeid,block_size);
+            free(args);
         }else if(strcmp(token,"cfs_pwd")==0) {
             token = strtok(NULL, "\n");
             if (token != NULL) {
@@ -258,6 +258,10 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
         get_superblock(open_fd,&super_block);
         super_block.node_counter++;
         set_superblock(open_fd,&super_block);
+        token=strtok(NULL,"\n");
+            if(token!=NULL){
+                cfs_mkdir(token,parent,block_size);
+            }
     }else{
         printf("This directory is full\n");
     }
@@ -515,6 +519,7 @@ unsigned int find_data(unsigned int nodeid,char*name,int block_size,int fd){
         lseek(fd,offset*sizeof(int),SEEK_CUR);
         offset++;
     }
-    if(i==mds.counter)
+    if(i==mds.counter){
         return -1;
+    }
 }
