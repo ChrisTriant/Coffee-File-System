@@ -21,3 +21,13 @@ typedef struct{
   int counter;
   int node_counter;
 }superBlockStruct;
+
+
+typedef struct{
+    int a_option;
+    int r_option;
+    int l_option;
+    int u_option;
+    int d_option;
+    int h_option;
+}options;
