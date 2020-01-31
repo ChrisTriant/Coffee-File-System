@@ -36,11 +36,12 @@ void update_size(unsigned int nodeid,int block_size, int size, int fd);
 unsigned int rm_nodeid(unsigned int nodeid,unsigned int dest_nodeid,int block_size, int fd);
 void cfs_writefile(unsigned int curNodeid, char *fileName, int blockSize);
 void cfs_cat(char *args, int curNodeid, int block_size);
+void cfs_ln(char *token, int curNodeid, int block_size);
 
 
 int main(int argc,char** argv){
     int err=scan_options();
-    
+
 }
 
 int scan_options(){
@@ -59,7 +60,7 @@ int scan_options(){
         getline(&buffer,&bufsize,stdin);
         token=strtok(buffer,"\n");
         token=strtok(buffer,skip);
-        if(strcmp(token,"cfs_create")==0){     
+        if(strcmp(token,"cfs_create")==0){
             if(token != NULL ) {
                 token = strtok(NULL,skip);
             }
@@ -200,6 +201,14 @@ int scan_options(){
             }
             free(filename);
             continue;
+        }else if(strcmp(token,"cfs_ln")==0) {
+            token = strtok(NULL, "\n");
+            if (token == NULL) {
+                printf("Input Error\n");
+                continue;
+            }
+            cfs_ln(token, current_nodeid, block_size);
+            continue;
         }
         printf("\n");
     }
@@ -276,7 +285,7 @@ void cfs_mkdir(char* dir_name,unsigned int parent,int block_size){
         unsigned int nodeid=find_space(open_fd);
         MDS new_mds;
         init_MDS(&new_mds,nodeid,parent,token,0);          //create new mds
-        lseek(open_fd,(nodeid+1)*block_size,SEEK_SET);   
+        lseek(open_fd,(nodeid+1)*block_size,SEEK_SET);
         write(open_fd,&new_mds,sizeof(MDS));
         lseek(open_fd, block_size- sizeof(int), SEEK_CUR);
         int buf = 0;
@@ -423,7 +432,7 @@ void cfs_cd(char* dest_name,unsigned int* current_nodeid,int block_size){
         }
     }
 
-    
+
 }
 
 void cfs_ls(unsigned int current_nodeid,int block_size,options* op){
@@ -444,7 +453,7 @@ void cfs_ls(unsigned int current_nodeid,int block_size,options* op){
         read(open_fd,&data_id,sizeof(int));
         if(data_id!=0){
             mds_array[i]=(MDS*)malloc(sizeof(MDS));
-            get_node_mds(mds_array[i],data_id,open_fd,block_size);       
+            get_node_mds(mds_array[i],data_id,open_fd,block_size);
             if(op->d_option==1){
                 if(mds_array[i]->type==0){
                     counter++;
@@ -456,7 +465,7 @@ void cfs_ls(unsigned int current_nodeid,int block_size,options* op){
                     counter++;
                 }else{
                     free(mds_array[i]);
-                }  
+                }
             }else{
                 counter++;
             }
@@ -650,7 +659,7 @@ void cfs_cat(char *args, int curNodeid, int block_size){
     MDS mds;
     get_node_mds(&mds,nodeid,open_fd,block_size);
     mds.modification_time=time(NULL);
-    update_node_mds(&mds,nodeid,block_size,open_fd); 
+    update_node_mds(&mds,nodeid,block_size,open_fd);
     update_size(nodeid,block_size,outsize,open_fd);
 }
 
@@ -720,6 +729,46 @@ void cfs_rm(char* args,unsigned int current_nodeid, int block_size){
 
 }
 
+void cfs_ln(char *token, int curNodeid, int block_size){
+    if(open_fd==-1){
+        printf("Error! No CFS file in use.\n");
+        return;
+    }
+    token=strtok(token," ");
+    char *sourcefile;
+    char *output;
+    if(token != NULL) {
+        sourcefile = malloc(100 * sizeof(char));
+        strcpy(sourcefile, token);
+        token = strtok(NULL, " ");
+        output = malloc(100 * sizeof(char));
+        strcpy(output, token);
+        if (token == NULL) {
+            printf("Input Error\n");
+        }
+    }else{
+        return;
+    }
+
+    unsigned int nodeid = find_data(curNodeid, sourcefile, block_size, open_fd);
+    MDS mds;
+    get_node_mds(&mds, nodeid, open_fd, block_size);
+    if(mds.type == 0){
+        printf("cfs_ln: %s: hard link not allowed for directory\n", sourcefile);
+    }
+    unsigned int outputid = find_data(curNodeid, output, block_size,open_fd);
+    if(outputid == -1){
+        cfs_touch(output, curNodeid, block_size);
+    }else{
+        printf("cfs_ln: failed to create hard link '%s': File exists\n", output);
+    }
+    outputid = find_data(curNodeid, output, block_size,open_fd);
+    get_node_mds(&mds, outputid, open_fd, block_size);
+    mds.type = 2;
+    update_node_mds(&mds, outputid, block_size, open_fd);
+    get_node_data(open_fd, outputid, block_size);
+    write(open_fd, &nodeid, sizeof(int));
+}
 
 unsigned int rm_nodeid(unsigned int nodeid,unsigned int del_nodeid,int block_size, int fd){
     MDS mds;
