@@ -32,8 +32,10 @@ void cfs_ls(unsigned int current_nodeid,int block_size,options* op);
 void call_ls(char* args,int current_nodeid,int block_size);
 int cmpfilename(const void* mds1 ,const void* mds2);
 void cfs_rm(char* args,unsigned int current_nodeid, int block_size);
-void update_size(unsigned int nodeid,int block_size, int size, int fd, int op);
+void update_size(unsigned int nodeid,int block_size, int size, int fd);
 unsigned int rm_nodeid(unsigned int nodeid,unsigned int dest_nodeid,int block_size, int fd);
+void cfs_writefile(unsigned int curNodeid, char *fileName, int blockSize);
+void cfs_cat(char *args, int curNodeid, int block_size);
 
 
 int main(int argc,char** argv){
@@ -173,6 +175,30 @@ int scan_options(){
                 continue;
             }
             cfs_rm(token,current_nodeid,block_size);
+            continue;
+        }else if(strcmp(token,"cfs_cat")==0){
+            token = strtok(NULL, "\n");
+            if(token==NULL){
+                printf("Input Error\n");
+                continue;
+            }
+            cfs_cat(token,current_nodeid,block_size);
+            continue;
+        }else if(strcmp(token,"cfs_writefile")==0){
+            token = strtok(NULL, "\n");
+            if(token==NULL){
+                printf("Input Error\n");
+                continue;
+            }
+            char*filename=malloc(strlen(token)+1);
+            strcpy(filename,token);
+            cfs_writefile(current_nodeid,filename,block_size);
+            token = strtok(NULL, " ");
+            if(token!=NULL){
+                printf("Input Error\n");
+                continue;
+            }
+            free(filename);
             continue;
         }
         printf("\n");
@@ -560,6 +586,78 @@ void call_ls(char* args,int current_nodeid,int block_size){
     }
 }
 
+
+void cfs_cat(char *args, int curNodeid, int block_size){
+    if(open_fd==-1){
+        printf("Error! No CFS file in use.\n");
+        return;
+    }
+    char *token;
+    char* buffer=malloc(block_size-sizeof(MDS));
+    char *outputfile;
+    int outsize;
+    int inputgiven=0;
+    int outputgiven=0;
+    token = strtok(args," ");
+    while(token!=NULL){
+        if(strcmp(token,"-o")==0){
+            token=strtok(NULL," ");
+            if(token==NULL){
+                printf("No output file given\n");
+                free(buffer);
+                return;
+            }else{
+                outputfile=malloc(strlen(token)+1);
+                strcpy(outputfile, token);
+                outputgiven=1;
+                break;
+            }
+        }else{
+            int nodeid=find_data(curNodeid,token,block_size,open_fd);
+            if(nodeid==-1){
+                printf("File %s not found\n",token);
+                free(buffer);
+                return;
+            }else{
+                char* buff = malloc((block_size- sizeof(MDS))*sizeof(char));
+                int bytes = read(open_fd, buff, block_size- sizeof(MDS));
+                if(outsize+bytes < block_size){
+                    strcat(buffer,buff);
+                    outsize+=bytes;
+                    inputgiven=1;
+                }else{
+                    printf("File %s has no free space for %s", outputfile, args);
+                    free(buff);
+                    break;
+                }
+            }
+        }
+    }
+    if(!inputgiven){
+        printf("Error! No input files given\n");
+    }
+    if(!outputgiven){
+        printf("Error! No output files given\n");
+    }
+
+    int nodeid=find_data(curNodeid,outputfile,block_size,open_fd);
+    if(nodeid==-1){
+        cfs_touch(outputfile, curNodeid, block_size);
+        nodeid=find_data(curNodeid,outputfile,block_size,open_fd);
+    }
+    get_node_data(open_fd,nodeid,block_size);
+    write(open_fd,buffer,block_size-sizeof(MDS));
+    MDS mds;
+    get_node_mds(&mds,nodeid,open_fd,block_size);
+    mds.modification_time=time(NULL);
+    update_node_mds(&mds,nodeid,block_size,open_fd); 
+    update_size(nodeid,block_size,outsize,open_fd);
+}
+
+
+
+
+
 void cfs_rm(char* args,unsigned int current_nodeid, int block_size){
     if(open_fd==-1){
         printf("Error! No CFS file in use.\n");
@@ -597,7 +695,7 @@ void cfs_rm(char* args,unsigned int current_nodeid, int block_size){
 
             MDS mds;
             get_node_mds(&mds,nodeid, open_fd, block_size);
-            update_size(mds.parent_nodeid, block_size, mds.size+sizeof(MDS), open_fd, 1);
+            update_size(mds.parent_nodeid, block_size, -(mds.size+sizeof(MDS)), open_fd);
 
             int *empty = malloc(block_size/sizeof(int));
             for (int i = 0; i < (block_size/sizeof(int)); ++i) {
@@ -657,6 +755,27 @@ unsigned int rm_nodeid(unsigned int nodeid,unsigned int del_nodeid,int block_siz
         return -1;
 }
 
+void cfs_writefile(unsigned int curNodeid, char *fileName, int blockSize) {
+    unsigned int nodeid = find_data(curNodeid, fileName, blockSize, open_fd);
+    if (nodeid == -1) {
+        return;
+    }
+    char *buff = malloc(blockSize - sizeof(MDS) * sizeof(char));
+    getline(&buff, (size_t *) &blockSize, stdin);
+
+    MDS mds;
+    get_node_mds(&mds, nodeid, open_fd, blockSize);
+    if (mds.size < blockSize) {
+        get_node_data(open_fd, nodeid, blockSize);
+        lseek(open_fd, mds.size, SEEK_CUR);
+
+        int bytes = write(open_fd, buff, strlen(buff));
+        mds.size += bytes;
+        update_size(mds.parent_nodeid, blockSize, bytes, open_fd);
+        update_node_mds(&mds, nodeid, blockSize, open_fd);
+    }
+    free(buff);
+}
 
 
 void print_time(time_t time){
@@ -683,16 +802,13 @@ void update_node_mds(MDS* mds,unsigned int nodeid,int block_size,int fd){
     write(fd,mds,sizeof(MDS));
 }
 
-void update_size(unsigned int nodeid,int block_size, int size, int fd, int op){
+void update_size(unsigned int nodeid,int block_size, int size, int fd){
     MDS mds;
     get_node_mds(&mds,nodeid,open_fd,block_size);
-    if(op == 0)
         mds.size += size;
-    else
-        mds.size -= size;
     update_node_mds(&mds, nodeid, block_size, fd);
     if(strcmp(mds.filename,"/")!=0){
-        update_size(mds.parent_nodeid,block_size, size,fd, op);
+        update_size(mds.parent_nodeid,block_size, size,fd);
     }
 }
 
