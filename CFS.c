@@ -36,6 +36,7 @@ void rm_file(MDS mds, int nodeid, int current_nodeid, int block_size, int fd);
 void update_size(unsigned int nodeid,int block_size, int size, int fd);
 void rm_nodeid(unsigned int nodeid,unsigned int dest_nodeid,int block_size, int fd);
 void rec_rm(unsigned int nodeid,int block_size, int fd);
+void new_hole(int nodeid, int fd);
 void cfs_writefile(unsigned int curNodeid, char *fileName, int blockSize);
 void cfs_cat(char *args, int curNodeid, int block_size);
 void cfs_ln(char *token, int curNodeid, int block_size);
@@ -750,7 +751,16 @@ void rm_file(MDS mds, int nodeid, int current_nodeid, int block_size, int fd){
     write(open_fd, empty, block_size);
 
     rm_nodeid(current_nodeid,nodeid,block_size, open_fd);
+    new_hole(nodeid, fd);
     free(empty);
+}
+
+void new_hole(int nodeid, int fd){
+    superBlockStruct sb;
+    get_superblock(fd,&sb);
+    write_node_index(nodeid, sb.counter, fd);
+    sb.counter++;
+    set_superblock(fd, &sb);
 }
 
 void rec_rm(unsigned int nodeid,int block_size, int fd){
@@ -915,14 +925,40 @@ void get_node_data(int fd,unsigned int nodeid,int block_size){
 }
 
 void write_node_index(unsigned int nodeid,int counter,int fd){
-    lseek(fd,counter*sizeof(int),SEEK_CUR);
-    write(fd,&nodeid,sizeof(unsigned int));
+    int data_id;
+    for (int j = 0; j <= counter; ++j) {
+        read(fd, &data_id, sizeof(int));
+        if (data_id == 0) {
+            write(fd, &nodeid, sizeof(int));
+        }else{
+            j--;
+        }
+    }
 }
 
 int find_space(int fd){
     int i;
-    i=GetNodeCounter(fd);
-    return i;
+    int data_id;
+    superBlockStruct sb;
+    get_superblock(fd, &sb);
+    if(sb.counter == 0) {
+        i = GetNodeCounter(fd);
+        return i;
+    }else{
+        int offset = 1;
+        for (int j = 0; j < sb.counter; ++j) {
+            read(fd,&data_id,sizeof(int));
+            if(data_id!=0){
+                int empty = 0;
+                write(fd, &empty, sizeof(int));
+                return  data_id;
+            }else{
+                j--;
+            }
+            lseek(fd,offset*sizeof(int),SEEK_CUR);
+            offset++;
+        }
+    }
 }
 
 void get_superblock(int fd,superBlockStruct* superblock){
