@@ -687,7 +687,7 @@ void cfs_rm(char* args,unsigned int current_nodeid, int block_size){
             if (token == NULL) {
                 printf("Input Error\n");
             }
-        } else if (strcmp(token, "-R") == 0) {
+        } else if (strcmp(token, "-r") == 0) {
             option = 2;
             token = strtok(NULL, " ");
             if (token == NULL) {
@@ -762,16 +762,16 @@ void rec_rm(unsigned int nodeid,int block_size, int fd){
     for(i=0;i<mds.counter;i++) {
         read(fd, &data_id, sizeof(int));
         if (data_id != 0) {
-            get_node_mds(&mds,data_id,fd,block_size);
+            MDS data_mds;
+            get_node_mds(&data_mds,data_id,fd,block_size);
             if (mds.type == 1 || mds.size == 0) {
-                rm_file(mds, data_id, nodeid, block_size, fd);
+                rm_file(data_mds, data_id, nodeid, block_size, fd);
             }else{
                 rec_rm(data_id, block_size, fd);
             }
         } else {
             i--;
         }
-        get_node_mds(&mds,nodeid,fd,block_size);
         get_node_data(fd, nodeid, block_size);
         lseek(fd, offset * sizeof(int), SEEK_CUR);
         offset++;
@@ -798,6 +798,8 @@ void rm_nodeid(unsigned int nodeid,unsigned int dest_nodeid,int block_size, int 
                 offset--;
                 lseek(fd,offset*sizeof(int),SEEK_CUR);
                 write(fd, &empty, sizeof(int));
+                mds.counter--;
+                update_node_mds(&mds, nodeid, block_size, fd);
                 break;
             }
         }else{
@@ -807,8 +809,6 @@ void rm_nodeid(unsigned int nodeid,unsigned int dest_nodeid,int block_size, int 
         lseek(fd,offset*sizeof(int),SEEK_CUR);
         offset++;
     }
-    //if(i==mds.counter)
-    //    return;
 }
 
 void cfs_ln(char *token, int curNodeid, int block_size){
