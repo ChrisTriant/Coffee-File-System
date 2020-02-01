@@ -620,11 +620,15 @@ void cfs_cat(char *args, int curNodeid, int block_size){
                 return;
             }else{
                 char* buff = malloc((block_size- sizeof(MDS))*sizeof(char));
-                int bytes = read(open_fd, buff, block_size- sizeof(MDS));
+                get_node_data(open_fd,nodeid,block_size);
+                MDS mds;
+                get_node_mds(&mds,nodeid,open_fd,block_size);
+                int bytes = read(open_fd, buff,mds.size-sizeof(MDS));
                 if(outsize+bytes < block_size){
                     strcat(buffer,buff);
                     outsize+=bytes;
                     inputgiven=1;
+                    free(buff);
                 }else{
                     printf("File %s has no free space for %s", outputfile, args);
                     free(buff);
@@ -632,13 +636,17 @@ void cfs_cat(char *args, int curNodeid, int block_size){
                 }
             }
         }
+        token=strtok(NULL," ");
     }
     if(!inputgiven){
         printf("Error! No input files given\n");
+        return;
     }
     if(!outputgiven){
         printf("Error! No output files given\n");
+        return;
     }
+    printf("%s\n",buffer);
 
     int nodeid=find_data(curNodeid,outputfile,block_size,open_fd);
     if(nodeid==-1){
@@ -767,7 +775,7 @@ void cfs_writefile(unsigned int curNodeid, char *fileName, int blockSize) {
     get_node_mds(&mds, nodeid, open_fd, blockSize);
     if (mds.size < blockSize) {
         get_node_data(open_fd, nodeid, blockSize);
-        lseek(open_fd, mds.size, SEEK_CUR);
+        lseek(open_fd, mds.size-sizeof(MDS), SEEK_CUR);
 
         int bytes = write(open_fd, buff, strlen(buff));
         mds.size += bytes;
