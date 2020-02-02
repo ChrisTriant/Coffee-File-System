@@ -486,7 +486,7 @@ int move_cd(char* dest_name,unsigned int* current_nodeid,int block_size,int to_r
         char* token=strtok(dest_name,"\n");
         to_root=0;
         if(token!=NULL && strcmp(dest_name,"/")!=0){
-            cfs_cd(token,current_nodeid,block_size,to_root);
+            move_cd(token,current_nodeid,block_size,to_root);
         }
     }else{
         to_root=0;
@@ -504,7 +504,7 @@ int move_cd(char* dest_name,unsigned int* current_nodeid,int block_size,int to_r
             update_node_mds(&mds,*current_nodeid,block_size,open_fd);
             token=strtok(NULL,"\n");
             if(token!=NULL){
-                cfs_cd(token,current_nodeid,block_size,to_root);
+                move_cd(token,current_nodeid,block_size,to_root);
             }
         }else{
             return -1;
@@ -987,9 +987,10 @@ void cfs_mv(char *args, int curNodeid, int block_size){
     MDS source_mds;
     int tempid = curNodeid;
     int nodeid = find_data(curNodeid, filename, block_size, open_fd);
-    if(nodeid != -1){
+    if(nodeid == -1){
         int found = move_cd(filename, &tempid,block_size, 1);
         if(found != -1){
+            move=1;
             nodeid = tempid;
         }
     }
@@ -1035,25 +1036,19 @@ void cfs_mv(char *args, int curNodeid, int block_size){
             printf("%s is a link\n", filename);
         }else {
             token = strtok(arggg, " ");
-            int temp_current = curNodeid;
-            int check = move_cd(filename, &temp_current,block_size, 1);
-            if(check == -1){
-                printf("Incorrect path\n");
-                return;
-            }
             for (int i = 0; i < count-1; ++i) {
                 int sourceid = find_data(curNodeid, token, block_size, open_fd);
                 get_node_mds(&source_mds, sourceid, open_fd,block_size);
                 rm_nodeid(source_mds.parent_nodeid, sourceid, block_size, open_fd);
                 update_size(source_mds.parent_nodeid, block_size, -source_mds.size, open_fd);
-                source_mds.parent_nodeid = temp_current;
+                source_mds.parent_nodeid = nodeid;
                 update_node_mds(&source_mds, sourceid, block_size, open_fd);
 
-                get_node_mds(&dir_mds, temp_current, open_fd, block_size);
+                get_node_mds(&dir_mds,nodeid, open_fd, block_size);
                 dir_mds.counter++;
-                update_node_mds(&dir_mds, temp_current, block_size, open_fd);
-                update_size(temp_current, block_size, source_mds.size, open_fd);
-                get_node_data(open_fd, temp_current, block_size);
+                update_node_mds(&dir_mds, nodeid, block_size, open_fd);
+                update_size(nodeid, block_size, source_mds.size, open_fd);
+                get_node_data(open_fd, nodeid, block_size);
                 write_node_index(sourceid, dir_mds.counter, open_fd);
                 strtok(NULL, " ");
             }
