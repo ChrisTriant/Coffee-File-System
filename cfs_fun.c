@@ -19,7 +19,6 @@ void cfs_create(char* filename,int block_size){
     int bytes = read(fd,&superblock,sizeof(superblock));
     if(bytes == 0){
         superblock.block_size=block_size;
-        superblock.numOfFiles=0;
         superblock.counter=0;
         superblock.node_counter=1;
         strcpy(superblock.fileType,"cfs");
@@ -798,7 +797,7 @@ void cfs_cp(char *args, int curNodeid, int block_size){
         if(strcmp(token, " ") != 0){
             if (strcmp(token, "-i") == 0) {
                 optionI = 1;
-            }else if(strcmp(token, "-r") || strcmp(token, "-R")  == 0){
+            }else if(strcmp(token, "-r") == 0 || strcmp(token, "-R")  == 0){
                 optionR=1;
             }else {
                 count++;
@@ -806,7 +805,6 @@ void cfs_cp(char *args, int curNodeid, int block_size){
         }
         token = strtok(NULL, " ");
     }
-    printf("%d\n",count);
 
     if(optionI==1) {
         printf("Copy? y or n\n");
@@ -872,7 +870,6 @@ void cfs_cp(char *args, int curNodeid, int block_size){
         }
     }else{
         get_node_mds(&dest_mds, nodeid, open_fd,block_size);
-        printf("%s\n",dest_mds.filename);
         if(dest_mds.type == 1){
             if(count>2){
                 printf("%s is not a directory\n",filename);
@@ -921,35 +918,57 @@ void cfs_cp(char *args, int curNodeid, int block_size){
                     continue;
                 }
 
-                char* buff = malloc(block_size*sizeof(char));
-                lseek(open_fd, (sourceid+1)*block_size, SEEK_SET);
-                read(open_fd, buff, block_size);
-
                 int flag = 0;
                 if(destid == -1) {
                     flag = 1;
                     destid = find_space(open_fd);
+
+                    char* buff = malloc(block_size*sizeof(char));
+                    lseek(open_fd, (sourceid+1)*block_size, SEEK_SET);
+                    read(open_fd, buff, block_size);
+
+                    lseek(open_fd, (destid+1)*block_size, SEEK_SET);
+                    write(open_fd, buff, block_size);
+                }else{
+                    MDS new_dest_mds;
+                    get_node_mds(&new_dest_mds, destid, open_fd, block_size);
+                    update_size(dest_mds.nodeid, block_size, -new_dest_mds.size, open_fd);
+
+                    char* buff = malloc((block_size-sizeof(MDS))*sizeof(char));
+                    get_node_data(open_fd,sourceid,block_size);
+                    read(open_fd, buff,block_size-sizeof(MDS));
+
+                    get_node_data(open_fd, destid, block_size);
+                    write(open_fd, buff, block_size-sizeof(MDS));
                 }
-                lseek(open_fd, (destid+1)*block_size, SEEK_SET);
-                write(open_fd, buff, block_size);
 
                 get_node_data(open_fd, dest_mds.nodeid, block_size);
                 if(flag == 1) {
                     write_node_index(destid, dest_mds.counter, open_fd);
                     dest_mds.counter++;
+
+                    superBlockStruct sb;
+                    get_superblock(open_fd, &sb);
+                    sb.node_counter++;
+                    set_superblock(open_fd,&sb);
                 }
                 dest_mds.modification_time = time(NULL);
                 update_node_mds(&dest_mds, dest_mds.nodeid, block_size, open_fd);
 
                 MDS source_mds;
-                get_node_mds(&source_mds, destid, open_fd, block_size);
-                source_mds.nodeid = destid;
-                source_mds.parent_nodeid = dest_mds.nodeid;
+                get_node_mds(&source_mds, sourceid, open_fd, block_size);
+
+                MDS new_dest_mds;
+                get_node_mds(&new_dest_mds, destid, open_fd, block_size);
+                new_dest_mds.nodeid = destid;
+                new_dest_mds.parent_nodeid = dest_mds.nodeid;
+                new_dest_mds.size = source_mds.size;
                 if(flag == 1){
-                    source_mds.creation_time = time(NULL);
+                    new_dest_mds.creation_time = time(NULL);
                 }
-                source_mds.modification_time = time(NULL);
-                update_node_mds(&source_mds, destid, block_size, open_fd);
+                new_dest_mds.modification_time = time(NULL);
+                update_node_mds(&new_dest_mds, destid, block_size, open_fd);
+                update_size(dest_mds.nodeid, block_size, new_dest_mds.size, open_fd);
                 token=strtok(NULL," ");
             }
         }

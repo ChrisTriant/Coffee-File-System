@@ -15,13 +15,11 @@ typedef struct {
     time_t creation_time ;
     time_t access_time ;
     time_t modification_time ;
-    //Datastream data ;
 } MDS ;
 
 typedef struct{
   char fileType[4];
   int block_size;
-  int numOfFiles;
   int counter;
   int node_counter;
 }superBlockStruct;
