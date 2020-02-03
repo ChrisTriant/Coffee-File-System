@@ -1,5 +1,9 @@
+#ifndef __STRUCT__
+#define __STRUCT__
 #include<time.h>
 #define FILENAME_SIZE 100
+
+int open_fd;
 
 typedef struct {
     unsigned int nodeid ;
@@ -31,3 +35,5 @@ typedef struct{
     int d_option;
     int h_option;
 }options;
+
+#endif
